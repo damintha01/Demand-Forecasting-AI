@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Demand Forecasting</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; color: #1a1a1a; }
+    h1 { font-size: 1.5rem; }
+    .controls { display: flex; gap: 8px; align-items: center; margin: 20px 0; }
+    input[type=number] { width: 70px; padding: 6px; }
+    button { padding: 8px 16px; cursor: pointer; }
+    #error { color: #b00020; margin-top: 8px; }
+    table { border-collapse: collapse; margin-top: 16px; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Monthly Car Sales — Demand Forecast</h1>
+
+  <div class="controls">
+    <label for="months">Months ahead:</label>
+    <input type="number" id="months" value="3" min="1" max="24">
+    <button id="forecastBtn">Forecast</button>
+  </div>
+  <div id="error"></div>
+
+  <canvas id="chart" height="120"></canvas>
+
+  <table id="forecastTable">
+    <thead><tr><th>Month</th><th>Predicted Sales</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    let chart;
+
+    async function loadHistory() {
+      const res = await fetch('/api/history');
+      return res.json();
+    }
+
+    function renderChart(history, forecast) {
+      const labels = [...history.map(h => h.date), ...forecast.map(f => f.date)];
+      const actual = [...history.map(h => h.sales), ...forecast.map(() => null)];
+      const predicted = [...history.map(() => null), ...forecast.map(f => f.predicted_sales)];
+      if (predicted.length > history.length) {
+        predicted[history.length - 1] = history[history.length - 1]?.sales ?? null;
+      }
+
+      const ctx = document.getElementById('chart');
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Actual', data: actual, borderColor: '#2563eb', spanGaps: false, pointRadius: 0 },
+            { label: 'Forecast', data: predicted, borderColor: '#dc2626', borderDash: [5, 5], spanGaps: true, pointRadius: 2 },
+          ],
+        },
+        options: { scales: { x: { ticks: { maxTicksLimit: 12 } } } },
+      });
+    }
+
+    function renderTable(forecast) {
+      const tbody = document.querySelector('#forecastTable tbody');
+      tbody.innerHTML = '';
+      forecast.forEach(f => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${f.date}</td><td>${f.predicted_sales.toLocaleString()}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function runForecast() {
+      const errorEl = document.getElementById('error');
+      errorEl.textContent = '';
+      const months = parseInt(document.getElementById('months').value, 10);
+
+      const [history, res] = await Promise.all([
+        loadHistory(),
+        fetch('/api/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ months }),
+        }),
+      ]);
+
+      const data = await res.json();
+      if (!res.ok) {
+        errorEl.textContent = data.error || 'Something went wrong.';
+        return;
+      }
+
+      renderChart(history, data.forecast);
+      renderTable(data.forecast);
+    }
+
+    document.getElementById('forecastBtn').addEventListener('click', runForecast);
+    window.addEventListener('DOMContentLoaded', runForecast);
+  </script>
+</body>
+</html>
