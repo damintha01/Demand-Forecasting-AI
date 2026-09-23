@@ -1,16 +1,4 @@
-"""
-Flask app serving the demand forecasting model trained by train_model.py.
 
-Run:
-    python train_model.py      # once, to create model/xgb_demand_model.pkl
-    python app.py               # starts the server on http://localhost:5000
-
-Endpoints:
-    GET  /                 -> simple UI (history chart + forecast form)
-    GET  /api/history       -> JSON of the historical monthly sales series
-    POST /api/predict       -> JSON forecast for the next N months
-        body: {"months": 3}
-"""
 from pathlib import Path
 
 import joblib
@@ -50,16 +38,7 @@ history_df = pd.read_csv(HISTORY_PATH, parse_dates=["date"]).sort_values("date")
 
 
 def build_next_month_features(sales_series: pd.Series, next_date: pd.Timestamp, next_time_index: int) -> pd.DataFrame:
-    """
-    Build the feature row for `next_date`, given all sales known so far
-    (sales_series, chronologically ordered, most recent last).
-
-    Note: the notebook's rolling_mean/rolling_std features are computed on the
-    CURRENT row's sales value (a look-ahead feature during training). For a
-    genuinely unknown future month we can't do that, so we approximate them
-    using only the most recent known months (i.e. the window ending at the
-    last observed month rather than the forecast month itself).
-    """
+    
     def lag(n):
         return sales_series.iloc[-n] if len(sales_series) >= n else None
 
