@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Log in — Demand Forecasting</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 360px; margin: 80px auto; padding: 0 16px; color: #1a1a1a; }
+    h1 { font-size: 1.5rem; margin-bottom: 24px; }
+    form { display: flex; flex-direction: column; gap: 12px; }
+    label { font-size: 0.9rem; }
+    input[type=text], input[type=password] { padding: 8px; font-size: 1rem; }
+    button { padding: 10px; font-size: 1rem; cursor: pointer; margin-top: 8px; }
+    .flash { color: #b00020; margin-bottom: 12px; }
+    .switch { margin-top: 16px; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Log in</h1>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for message in messages %}
+        <div class="flash">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <form method="post">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" required autofocus>
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" required>
+
+    <button type="submit">Log in</button>
+  </form>
+
+  <div class="switch">
+    Don't have an account? <a href="{{ url_for('auth.signup') }}">Sign up</a>
+  </div>
+</body>
+</html>

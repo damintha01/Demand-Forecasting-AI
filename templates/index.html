@@ -14,10 +14,16 @@
     table { border-collapse: collapse; margin-top: 16px; width: 100%; }
     th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: right; }
     th:first-child, td:first-child { text-align: left; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; }
+    .topbar span { font-size: 0.9rem; color: #555; }
+    .topbar a { font-size: 0.9rem; }
   </style>
 </head>
 <body>
-  <h1>Monthly Car Sales — Demand Forecast</h1>
+  <div class="topbar">
+    <h1>Monthly Car Sales — Demand Forecast</h1>
+    <span>{{ full_name }} · <a href="{{ url_for('auth.logout') }}">Log out</a></span>
+  </div>
 
   <div class="controls">
     <label for="months">Months ahead:</label>

@@ -1,9 +1,13 @@
 
+import os
 from pathlib import Path
 
 import joblib
 import pandas as pd
 from flask import Flask, jsonify, render_template, request
+from flask_login import current_user, login_required
+
+from auth import auth_bp, init_db, login_manager
 
 MODEL_DIR = Path(__file__).parent / "model"
 MODEL_PATH = MODEL_DIR / "xgb_demand_model.pkl"
@@ -26,6 +30,13 @@ FEATURE_COLUMNS = [
 ]
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
+
+login_manager.init_app(app)
+app.register_blueprint(auth_bp)
+
+with app.app_context():
+    init_db()
 
 if not MODEL_PATH.exists() or not HISTORY_PATH.exists():
     raise FileNotFoundError(
@@ -85,11 +96,13 @@ def forecast(months: int) -> list[dict]:
 
 
 @app.route("/")
+@login_required
 def index():
-    return render_template("index.html")
+    return render_template("index.html", full_name=current_user.full_name)
 
 
 @app.route("/api/history")
+@login_required
 def api_history():
     records = history_df[["date", "sales"]].copy()
     records["date"] = records["date"].dt.strftime("%Y-%m-%d")
@@ -97,6 +110,7 @@ def api_history():
 
 
 @app.route("/api/predict", methods=["POST"])
+@login_required
 def api_predict():
     payload = request.get_json(silent=True) or {}
     try:
