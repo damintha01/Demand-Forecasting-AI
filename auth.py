@@ -10,6 +10,7 @@ DB_PATH = Path(__file__).parent / "instance" / "users.db"
 
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"
+login_manager.login_message = None
 
 auth_bp = Blueprint("auth", __name__)
 
