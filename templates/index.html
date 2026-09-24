@@ -2,48 +2,94 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Demand Forecasting</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard — Demand Forecasting</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; color: #1a1a1a; }
-    h1 { font-size: 1.5rem; }
-    .controls { display: flex; gap: 8px; align-items: center; margin: 20px 0; }
-    input[type=number] { width: 70px; padding: 6px; }
-    button { padding: 8px 16px; cursor: pointer; }
-    #error { color: #b00020; margin-top: 8px; }
-    table { border-collapse: collapse; margin-top: 16px; width: 100%; }
-    th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: right; }
-    th:first-child, td:first-child { text-align: left; }
-    .topbar { display: flex; justify-content: space-between; align-items: center; }
-    .topbar span { font-size: 0.9rem; color: #555; }
-    .topbar a { font-size: 0.9rem; }
-  </style>
 </head>
 <body>
-  <div class="topbar">
-    <h1>Monthly Car Sales — Demand Forecast</h1>
-    <span>{{ full_name }} · <a href="{{ url_for('auth.logout') }}">Log out</a></span>
-  </div>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>
+        </span>
+        Demand Forecast
+      </div>
+      <div class="user-menu">
+        <span class="avatar" id="avatar" aria-hidden="true"></span>
+        <span class="user-name" id="userName">{{ full_name }}</span>
+        <a class="btn btn-ghost" href="{{ url_for('auth.logout') }}">Log out</a>
+      </div>
+    </div>
+  </header>
 
-  <div class="controls">
-    <label for="months">Months ahead:</label>
-    <input type="number" id="months" value="3" min="1" max="24">
-    <button id="forecastBtn">Forecast</button>
-  </div>
-  <div id="error"></div>
+  <main class="container">
+    <div class="page-head">
+      <div>
+        <h1>Monthly Car Sales</h1>
+        <p>Historical sales and model-predicted demand.</p>
+      </div>
+      <div class="controls">
+        <div class="field">
+          <label for="months">Months ahead</label>
+          <input type="number" id="months" value="6" min="1" max="24">
+        </div>
+        <button class="btn" id="forecastBtn">Forecast</button>
+      </div>
+    </div>
 
-  <canvas id="chart" height="120"></canvas>
+    <div class="error" id="error" role="alert" hidden></div>
 
-  <table id="forecastTable">
-    <thead><tr><th>Month</th><th>Predicted Sales</th></tr></thead>
-    <tbody></tbody>
-  </table>
+    <section class="kpis" aria-label="Key metrics">
+      <div class="card kpi"><div class="label">Last actual</div><div class="value" id="kpiLast">—</div><div class="delta" id="kpiLastDate">&nbsp;</div></div>
+      <div class="card kpi"><div class="label">Next month forecast</div><div class="value" id="kpiNext">—</div><div class="delta" id="kpiNextDelta">&nbsp;</div></div>
+      <div class="card kpi"><div class="label">Forecast total</div><div class="value" id="kpiTotal">—</div><div class="delta" id="kpiTotalSub">&nbsp;</div></div>
+      <div class="card kpi"><div class="label">Forecast peak</div><div class="value" id="kpiPeak">—</div><div class="delta" id="kpiPeakDate">&nbsp;</div></div>
+    </section>
+
+    <div class="grid-main">
+      <section class="card">
+        <div class="card-head">
+          <h2>Sales trend</h2>
+          <div class="legend">
+            <span style="--c: var(--actual)">Actual</span>
+            <span style="--c: var(--forecast)">Forecast</span>
+          </div>
+        </div>
+        <div class="chart-box"><canvas id="chart" aria-label="Sales history and forecast chart" role="img"></canvas></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Forecast</h2>
+          <button class="btn btn-ghost" id="exportBtn" disabled>Export CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table id="forecastTable">
+            <thead><tr><th>Month</th><th>Predicted sales</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
 
   <script>
     let chart;
+    let lastForecast = [];
+    const $ = id => document.getElementById(id);
+    const fmt = n => Math.round(n).toLocaleString();
+    const monthLabel = d => new Date(d + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+    const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+    $('avatar').textContent = $('userName').textContent.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
     async function loadHistory() {
       const res = await fetch('/api/history');
+      if (!res.ok) throw new Error('Could not load sales history.');
       return res.json();
     }
 
@@ -51,22 +97,37 @@
       const labels = [...history.map(h => h.date), ...forecast.map(f => f.date)];
       const actual = [...history.map(h => h.sales), ...forecast.map(() => null)];
       const predicted = [...history.map(() => null), ...forecast.map(f => f.predicted_sales)];
-      if (predicted.length > history.length) {
-        predicted[history.length - 1] = history[history.length - 1]?.sales ?? null;
-      }
+      if (forecast.length) predicted[history.length - 1] = history[history.length - 1].sales;
 
-      const ctx = document.getElementById('chart');
+      const text = cssVar('--muted'), grid = cssVar('--grid');
       if (chart) chart.destroy();
-      chart = new Chart(ctx, {
+      chart = new Chart($('chart'), {
         type: 'line',
         data: {
           labels,
           datasets: [
-            { label: 'Actual', data: actual, borderColor: '#2563eb', spanGaps: false, pointRadius: 0 },
-            { label: 'Forecast', data: predicted, borderColor: '#dc2626', borderDash: [5, 5], spanGaps: true, pointRadius: 2 },
+            { label: 'Actual', data: actual, borderColor: cssVar('--actual'), backgroundColor: cssVar('--actual') + '22', fill: true, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: .25 },
+            { label: 'Forecast', data: predicted, borderColor: cssVar('--forecast'), borderWidth: 2.5, borderDash: [6, 5], spanGaps: true, pointRadius: 3, pointHoverRadius: 5, tension: .25 },
           ],
         },
-        options: { scales: { x: { ticks: { maxTicksLimit: 12 } } } },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: items => monthLabel(items[0].label),
+                label: c => c.raw == null ? null : ` ${c.dataset.label}: ${fmt(c.raw)}`,
+              },
+            },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: text, maxTicksLimit: 8, callback(v) { return monthLabel(this.getLabelForValue(v)); } } },
+            y: { grid: { color: grid }, ticks: { color: text, callback: v => v.toLocaleString() } },
+          },
+        },
       });
     }
 
@@ -75,36 +136,78 @@
       tbody.innerHTML = '';
       forecast.forEach(f => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${f.date}</td><td>${f.predicted_sales.toLocaleString()}</td>`;
+        tr.innerHTML = `<td>${monthLabel(f.date)}</td><td>${fmt(f.predicted_sales)}</td>`;
         tbody.appendChild(tr);
       });
     }
 
-    async function runForecast() {
-      const errorEl = document.getElementById('error');
-      errorEl.textContent = '';
-      const months = parseInt(document.getElementById('months').value, 10);
+    function renderKpis(history, forecast) {
+      const last = history[history.length - 1];
+      const next = forecast[0];
+      const total = forecast.reduce((s, f) => s + f.predicted_sales, 0);
+      const peak = forecast.reduce((m, f) => f.predicted_sales > m.predicted_sales ? f : m, forecast[0]);
+      const pct = (next.predicted_sales - last.sales) / last.sales * 100;
 
-      const [history, res] = await Promise.all([
-        loadHistory(),
-        fetch('/api/predict', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ months }),
-        }),
-      ]);
-
-      const data = await res.json();
-      if (!res.ok) {
-        errorEl.textContent = data.error || 'Something went wrong.';
-        return;
-      }
-
-      renderChart(history, data.forecast);
-      renderTable(data.forecast);
+      $('kpiLast').textContent = fmt(last.sales);
+      $('kpiLastDate').textContent = monthLabel(last.date);
+      $('kpiNext').textContent = fmt(next.predicted_sales);
+      $('kpiNextDelta').textContent = `${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}% vs last actual`;
+      $('kpiNextDelta').className = 'delta ' + (pct >= 0 ? 'up' : 'down');
+      $('kpiTotal').textContent = fmt(total);
+      $('kpiTotalSub').textContent = `Next ${forecast.length} month${forecast.length > 1 ? 's' : ''}`;
+      $('kpiPeak').textContent = fmt(peak.predicted_sales);
+      $('kpiPeakDate').textContent = monthLabel(peak.date);
     }
 
-    document.getElementById('forecastBtn').addEventListener('click', runForecast);
+    function showError(msg) {
+      const el = $('error');
+      el.textContent = msg;
+      el.hidden = !msg;
+    }
+
+    async function runForecast() {
+      showError('');
+      const btn = $('forecastBtn');
+      btn.disabled = true;
+      btn.textContent = 'Forecasting…';
+      try {
+        const months = parseInt($('months').value, 10);
+        const [history, res] = await Promise.all([
+          loadHistory(),
+          fetch('/api/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ months }),
+          }),
+        ]);
+        const data = await res.json();
+        if (!res.ok) { showError(data.error || 'Something went wrong.'); return; }
+
+        lastForecast = data.forecast;
+        renderChart(history, data.forecast);
+        renderTable(data.forecast);
+        renderKpis(history, data.forecast);
+        $('exportBtn').disabled = false;
+      } catch (err) {
+        showError(err.message || 'Something went wrong.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Forecast';
+      }
+    }
+
+    function exportCsv() {
+      const rows = ['date,predicted_sales', ...lastForecast.map(f => `${f.date},${f.predicted_sales}`)];
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv' }));
+      a.download = 'forecast.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    $('forecastBtn').addEventListener('click', runForecast);
+    $('exportBtn').addEventListener('click', exportCsv);
+    $('months').addEventListener('keydown', e => { if (e.key === 'Enter') runForecast(); });
     window.addEventListener('DOMContentLoaded', runForecast);
   </script>
 </body>

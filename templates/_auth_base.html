@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} — Demand Forecasting</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="auth-shell">
+    <aside class="auth-side">
+      <div class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>
+        </span>
+        Demand Forecast
+      </div>
+      <div>
+        <h2>Plan ahead with confident sales forecasts.</h2>
+        <p>An XGBoost model trained on historical monthly car sales predicts demand up to 24 months out.</p>
+        <ul class="auth-points">
+          <li>Multi-month recursive forecasting</li>
+          <li>Interactive history and forecast chart</li>
+          <li>Export predictions to CSV</li>
+        </ul>
+      </div>
+      <small style="opacity:.7">© Demand Forecasting AI</small>
+    </aside>
+
+    <main class="auth-main">
+      <div class="auth-card">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+</body>
+</html>
